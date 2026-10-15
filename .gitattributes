@@ -1,0 +1,21 @@
+* text=auto
+
+# Explicit LF for text files so Windows checkouts stay consistent
+*.py        text diff=python
+*.md        text
+*.toml      text
+*.cfg       text
+*.txt       text
+*.yml       text
+*.yaml      text
+*.sh        text eol=lf
+.gitignore  text
+LICENSE     text
+
+# Binary assets
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.webp      binary
+*.svg       text
+*.xcf       binary

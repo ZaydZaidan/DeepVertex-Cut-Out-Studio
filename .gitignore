@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# App runtime (local installs only)
+runtime-libs/
+*.log
+tools/
+
+# Internal working notes (never published)
+HANDOFF.md
+
+# Editors / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp

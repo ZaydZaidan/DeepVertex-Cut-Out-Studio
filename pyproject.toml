@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deepvertex-cutout-studio"
+version = "1.0.0"
+description = "Local, GPU-accelerated AI background remover — clean-room reconstruction of the remove.bg pipeline using open-source SOTA matting models (BiRefNet / RMBG-2.0)."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "Zayd Zaidan", email = "zaydzihnizaidan@gmail.com" }]
+keywords = [
+  "background-removal", "image-mattening", "cutout", "birefnet", "rmbg",
+  "pytorch", "pyside6", "cuda", "computer-vision",
+]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: X11 Applications :: Qt",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Multimedia :: Graphics :: Graphics Conversion",
+  "Topic :: Scientific/Engineering :: Image Processing",
+]
+dependencies = [
+  "numpy>=1.26",
+  "scipy>=1.11",
+  "Pillow>=10.0",
+  "pymatting>=1.1.12",
+  "transformers>=4.39",
+  "huggingface_hub>=0.23",
+  "timm>=1.0",
+  "einops>=0.8",
+  "kornia>=0.7",
+  "PySide6>=6.6",
+  "torch>=2.4",
+  "torchvision>=0.19",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+render = ["cairosvg>=2.7"]
+
+[project.urls]
+Homepage = "https://github.com/ZaydZaidan/DeepVertex-Cut-Out-Studio"
+Repository = "https://github.com/ZaydZaidan/DeepVertex-Cut-Out-Studio"
+Issues = "https://github.com/ZaydZaidan/DeepVertex-Cut-Out-Studio/issues"
+Changelog = "https://github.com/ZaydZaidan/DeepVertex-Cut-Out-Studio/blob/main/CHANGELOG.md"
+
+[project.scripts]
+cutout-studio = "cutout.gui:main"
+cutout = "cutout.cli:main"
+
+[tool.setuptools]
+packages = ["cutout"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

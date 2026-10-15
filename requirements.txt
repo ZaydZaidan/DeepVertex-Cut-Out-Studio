@@ -1,0 +1,20 @@
+# Convenience dependency file — the authoritative list lives in pyproject.toml.
+#
+# For NVIDIA GPU inference, install PyTorch first with the CUDA index, e.g.:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
+# (use cu128/cu126/... or the CPU index to match your system; see
+#  https://pytorch.org/get-started/locally/)
+#
+# Then:  pip install -r requirements.txt
+numpy>=1.26
+scipy>=1.11
+Pillow>=10.0
+pymatting>=1.1.12
+transformers>=4.39
+huggingface_hub>=0.23
+timm>=1.0
+einops>=0.8
+kornia>=0.7
+PySide6>=6.6
+torch>=2.4
+torchvision>=0.19

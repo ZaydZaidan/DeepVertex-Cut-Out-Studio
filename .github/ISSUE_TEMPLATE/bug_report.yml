@@ -1,0 +1,58 @@
+name: Bug report
+description: Report a problem with the GUI, CLI, engine, or pipelining.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report.
+        Please include the full error text — for the GUI, paste the contents of
+        `~/.cache/cutout-studio/gui.log`.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - GUI
+        - CLI
+        - Matting engine (BiRefNet / RMBG-2.0)
+        - Refinement (guided / matting / holes / feather / defringe)
+        - Composition (backgrounds / shadow / export)
+        - Packaging / install / CI
+        - Docs / other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Steps to reproduce, expected vs actual behaviour.
+      placeholder: "1. Run `./run.sh cli photo.jpg --bg blur` …"
+    validations:
+      required: true
+  - type: textarea
+    id: error-output
+    attributes:
+      label: Error / log output
+      render: shell
+  - type: input
+    id: os
+    attributes:
+      label: OS & version
+      placeholder: "Ubuntu 24.04"
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Python / torch / GPU versions
+      placeholder: "Python 3.12, torch 2.14.1+cu130, RTX 5050 (or CPU)"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version (`cutout.gui` / git commit)
+      placeholder: "1.0.0"
+    validations:
+      required: true

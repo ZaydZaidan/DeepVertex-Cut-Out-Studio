@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="DeepVertex Cut-Out Studio">
+  <title>DeepVertex Cut-Out Studio</title>
+  <defs>
+    <!-- single light direction for the whole mark: bright cyan top-left ->
+         deeper blue bottom-right (matches the subject disc) -->
+    <linearGradient id="brand" x1="96" y1="96" x2="432" y2="432" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="subject" x1="140" y1="200" x2="330" y2="380" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7dd3fc"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+    <pattern id="checker" width="44" height="44" patternUnits="userSpaceOnUse">
+      <rect width="44" height="44" fill="#22304c"/>
+      <rect width="22" height="22" fill="#3d4c72"/>
+      <rect x="22" y="22" width="22" height="22" fill="#3d4c72"/>
+    </pattern>
+  </defs>
+
+  <!-- the cut-away corner shows transparency, clipped to the notch with the
+       same rounded outer corner as the tile -->
+  <path d="M 320 48 L 376 48 A 88 88 0 0 1 464 136 L 464 192 Z" fill="url(#checker)"/>
+  <!-- outline continues around the notch so the silhouette stays unified -->
+  <path d="M 320 48 H 376 A 88 88 0 0 1 464 136 V 192"
+        fill="none" stroke="url(#brand)" stroke-width="12"/>
+
+  <!-- photo tile with the corner sliced off (the stroke also outlines the cut) -->
+  <path d="M 136 48 H 320 L 464 192 V 376 A 88 88 0 0 1 376 464 H 136 A 88 88 0 0 1 48 376 V 136 A 88 88 0 0 1 136 48 Z"
+        fill="#101a2e" stroke="url(#brand)" stroke-width="12"/>
+
+  <!-- the subject that was kept, nudged to the optical centre -->
+  <circle cx="228" cy="294" r="110" fill="url(#subject)"/>
+</svg>
