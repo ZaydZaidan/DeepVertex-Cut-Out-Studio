@@ -47,9 +47,10 @@ free because your own GPU does the work.
 - **3D Product Snapshot** (new in 1.1.0) — turn a **STEP / STL / OBJ / PLY /
   GLB** model into a full set of webshop-ready images: the six CAD views,
   the 3/4 *hero* angles, custom turntable spins, on a **transparent** canvas,
-  a **pure-white** Amazon-style main image, a **studio** gradient with soft
-  contact shadow, dark/sunset backdrops, or any solid colour. Rendering is
-  local GPU/OpenGL — study in [`docs/3D_SNAPSHOT_RECON.md`](docs/3D_SNAPSHOT_RECON.md).
+  a **pure-white** Amazon-style main image, a **studio** gradient with
+  two-lobe contact shadow + optional floor reflection, dark/sunset backdrops,
+  or any solid colour. Rendering is local GPU/OpenGL — study in
+  [`docs/3D_SNAPSHOT_RECON.md`](docs/3D_SNAPSHOT_RECON.md).
 
 | ![3D snapshot — studio](assets/screenshots/mesh-studio.png) | ![3D snapshot — white](assets/screenshots/mesh-white.png) | ![3D snapshot — transparent](assets/screenshots/mesh-transparent.jpg) |
 |---|---|---|
@@ -202,6 +203,7 @@ Examples:
 | `--bg` | `studio` | `studio` (gradient + contact shadow) · `white` (pure 255, no shadow — Amazon main image) · `transparent` (alpha PNG/WebP) · `dark` · `sunset` · `color` |
 | `--bg-color` | `#ffffff` | colour for `--bg color` |
 | `--shadow` | `auto` | `on` / `off` / `auto` (auto: on for studio/dark/sunset/color) |
+| `--reflection` | `auto` | floor reflection under the product (`auto`: on for studio/dark/sunset/colour backgrounds) |
 | `--size` | `1600` | output pixel size (square) |
 | `--format` | `png` | `png` / `webp` / `jpg` |
 | `--fill` | `0.85` | subject fill fraction of the frame (Amazon main-image rule = 0.85) |

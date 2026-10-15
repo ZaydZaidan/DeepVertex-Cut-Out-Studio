@@ -24,6 +24,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--bg-color", default="#ffffff", help="colour for --bg color")
     p.add_argument("--shadow", choices=["auto", "on", "off"], default="auto",
                    help="soft contact shadow (auto: on except transparent/white)")
+    p.add_argument("--reflection", choices=["auto", "on", "off"], default="auto",
+                   help="floor reflection (auto: on for studio/dark/sunset/colour)")
     p.add_argument("--size", type=int, default=1600, help="long-edge size in px (256..4096)")
     p.add_argument("--format", dest="fmt", choices=["png", "webp", "jpg"], default="png")
     p.add_argument("--fill", type=float, default=None,
@@ -55,6 +57,7 @@ def main(argv: list[str] | None = None) -> int:
             size=args.size,
             fmt=args.fmt,
             shadow=args.shadow,
+            reflection=args.reflection,
             fill=args.fill if args.fill is not None else DEFAULT_FILL,
             sheet=args.sheet,
         )

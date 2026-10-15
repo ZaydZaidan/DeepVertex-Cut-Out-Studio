@@ -164,25 +164,38 @@ def _export(img: Image.Image, path: Path, fmt: str, flatten_color=(255, 255, 255
         raise ValueError(f"unsupported format {fmt!r}")
 
 
+def _small_noise(shape, strength=0.8):
+    """Blue-ish uniform dither (adds grain ~1 LSB to kill gradient banding)."""
+    rng = np.random.default_rng(7)
+    return rng.uniform(-strength, strength, size=shape).astype(np.float32)[..., None]
+
+
 def _flatten_hex(hex_color: str):
     hx = hex_color.lstrip("#")
     return tuple(int(hx[i : i + 2], 16) for i in (0, 2, 4))
 
 
-def _composite(rgb, alpha_prod, bg_tuple, shadow_mask):
-    """Product RGBA (+ optional two-lobe soft floor shadow) -> uint8 HxWx4."""
+def _composite(rgb, alpha_prod, bg_tuple, shadow_mask, refl_rgb=None):
+    """Product RGBA (+ shadow lobes + floor reflection) -> uint8 HxWx4."""
     a_prod = np.clip(alpha_prod, 0.0, 1.0)[..., None].astype(np.float32)
     if shadow_mask is not None:
-        wide = np.clip(shadow_mask.get("wide"), 0.0, 1.0)
-        tight = np.clip(shadow_mask.get("tight"), 0.0, 1.0)
+        wv = shadow_mask.get("wide")
+        tv = shadow_mask.get("tight")
+        wide = np.clip(wv, 0.0, 1.0) if wv is not None else np.zeros(np.shape(rgb)[:2], dtype=np.float32)
+        tight = np.clip(tv, 0.0, 1.0) if tv is not None else np.zeros(np.shape(rgb)[:2], dtype=np.float32)
     else:
         wide = tight = np.zeros(np.shape(rgb)[:2], dtype=np.float32)
 
     if bg_tuple is not None:
-        # GL pass already wrote the backdrop underneath the product: darken the
-        # floor region: wide soft lobe + tight contact occlusion at the base.
-        dark = 1.0 - np.clip(0.30 * wide + 0.45 * tight, 0.0, 0.55)
-        rgbf = rgb.astype(np.float32) * dark[..., None]
+        # GL pass already wrote the backdrop underneath the product. Blend the
+        # mirrored-mesh floor reflection under the product, then darken the
+        # floor with the wide/tight shadow lobes.
+        rgbf = rgb.astype(np.float32)
+        if refl_rgb is not None:
+            ref_rgb, w = refl_rgb
+            rgbf = rgbf * (1.0 - w[..., None]) + ref_rgb * w[..., None]
+        dark = 1.0 - np.clip(0.22 * wide + 0.68 * tight, 0.0, 0.78)
+        rgbf = rgbf * dark[..., None]
         full = np.ones_like(rgbf[..., :1])
         return np.dstack([rgbf, full]).astype(np.uint8)
 
@@ -207,6 +220,7 @@ def render_snapshots(
     fill: float = DEFAULT_FILL,
     sheet: bool = True,
     material: dict | None = None,
+    reflection: str = "auto",
 ) -> list[Path]:
     """Render every requested view of *model_path* into *out_dir*.
 
@@ -219,6 +233,9 @@ def render_snapshots(
 
     *shadow*: "auto" (on for studio/dark/sunset/color, off for transparent
     and white), "on", or "off".
+
+    *reflection*: floor reflection of the product on opaque backdrops
+    ("auto" = on for studio/dark/sunset/color; "on"/"off").
     """
     from .renderer import GLRenderer
 
@@ -246,6 +263,10 @@ def render_snapshots(
         shadow_on = True
     elif shadow == "off":
         shadow_on = False
+
+    reflection_on = reflection == "on" or (reflection == "auto" and bg in (
+        "studio", "dark", "sunset", "color"
+    ))
 
     flatten = (255, 255, 255) if bg != "color" else _flatten_hex(bg_color)
     outputs: list[Path] = []
@@ -276,46 +297,89 @@ def render_snapshots(
                     mesh, view, proj, cam_pos, bg=None
                 )
 
-            mask = None  # soft contact shadow (image space, on the floor only)
-            if shadow_on:
+            # per-column lowest silhouette row (the product base line)
+            has_prod = alpha_prod > 0.3
+            base_row = np.where(
+                has_prod.any(axis=0),
+                np.where(has_prod, np.arange(size)[:, None], 0).max(axis=0),
+                -1,
+            )
+            rows_grad = np.arange(size)[:, None].astype(np.float32)
+            mask = None      # shadow dict {wide, tight} (see _composite)
+            refl_rgb = None  # floor reflection: (rgb, per-pixel weight)
+            if shadow_on or reflection_on:
                 from .renderer import KEY_LIGHT
 
-                raw = _shadow_mask(mesh, view, proj, size, KEY_LIGHT[0])
-                soft = np.asarray(
-                    Image.fromarray((raw * 255).astype(np.uint8)).filter(
-                        ImageFilter.GaussianBlur(radius=max(8, size // 90))
-                    ),
-                    dtype=np.float32,
-                ) / 255.0
-                keep = np.clip(1.0 - alpha_prod, 0.0, 1.0)
-                mask = np.clip(soft * keep, 0.0, 1.0)          # wide blurred lobe
-                # tight contact occlusion: only the floor band *below* the
-                # product's lowest silhouette row per column
-                has_prod = alpha_prod > 0.3
-                base_row = np.where(
-                    has_prod.any(axis=0),
-                    np.where(has_prod, np.arange(size)[:, None], 0).max(axis=0),
-                    -1,
-                )
-                base = np.zeros((size, size), dtype=np.float32)
-                cols = base_row >= 0
-                if cols.any():
-                    rows = np.arange(size)[:, None]
-                    base[:, cols] = (
-                        rows >= base_row[cols][None, :].astype(float) - float(max(8, size // 90))
-                    ).astype(np.float32)
-                contact = np.clip(raw * base * keep, 0.0, 1.0)
-                contact = np.asarray(
-                    Image.fromarray((contact * 255).astype(np.uint8)).filter(
-                        ImageFilter.GaussianBlur(radius=max(10, size // 120))
-                    ),
-                    dtype=np.float32,
-                ) / 255.0
-                mask = dict(wide=mask, tight=contact)
+                foreground_keep = np.clip(1.0 - alpha_prod, 0.0, 1.0)
+                band = float(max(8, size // 90))
+                cols_ok = base_row >= 0
 
-            frame = Image.fromarray(
-                _composite(rgb, alpha_prod, bg_tuple, mask), "RGBA"
-            )
+                # floor line fitted through the product's base row per column
+                # (approximates the on-screen floor plane outside the product)
+                line = np.zeros(size, dtype=np.float32)
+                xs = np.flatnonzero(cols_ok)
+                if len(xs) > 8:
+                    a, b = np.polyfit(xs, base_row[xs].astype(float), 1)
+                    line = np.clip(a * np.arange(size) + b, 0.45 * size, 0.96 * size)
+                else:
+                    line[:] = base_row.max() if cols_ok.any() else size * 0.8
+                drop = rows_grad - line[None, :]
+                below_floor = (drop >= -band).astype(np.float32)
+
+                def _blur(a, rad):
+                    return np.asarray(
+                        Image.fromarray((np.clip(a, 0, 1) * 255).astype(np.uint8)).filter(
+                            ImageFilter.GaussianBlur(radius=float(rad))
+                        ),
+                        dtype=np.float32,
+                    ) / 255.0
+
+                if shadow_on:
+                    raw = _shadow_mask(mesh, view, proj, size, KEY_LIGHT[0])
+                    raw_floor = np.clip(raw * below_floor * foreground_keep, 0, 1)
+                    # distance-based penumbra: sharpish/dark near the contact,
+                    # diffuse further out (no uniform blur, no hard rectangle)
+                    near_weight = np.exp(-np.clip(drop, 0, None) / (0.10 * size))
+                    core = _blur(raw_floor * near_weight, max(3, size // 240))
+                    diffuse = _blur(raw_floor, max(16, size // 30))
+                    # wrap-around occlusion: halo of the silhouette confined to
+                    # the floor band (darkens under the base on the lit side)
+                    halo = _blur(alpha_prod, max(6, size // 80))
+                    rim = _blur(alpha_prod, max(3, size // 260))  # hugs the base rim
+                    contact = np.clip(
+                        0.85 * core + 0.85 * halo * below_floor * foreground_keep
+                        + 1.25 * rim * below_floor * foreground_keep,
+                        0, 1,
+                    )
+                    contact = _blur(contact, max(6, size // 200))
+                    wide = np.clip(
+                        0.55 * _blur(diffuse, max(10, size // 110)) * (1.0 - near_weight * 0.5)
+                        + 0.30 * contact,
+                        0, 1,
+                    ) * below_floor * foreground_keep
+                    wide = _blur(wide, max(4, size // 160))
+                    tight = np.clip(contact + 0.25 * wide, 0.0, 1.0)
+                    mask = dict(wide=wide, tight=tight)
+                if reflection_on and bg_tuple is not None:
+                    mirrored = mesh.copy()
+                    floor_y = float(mesh.bounds[0][1])
+                    mirrored.apply_transform(
+                        np.array([
+                            [1, 0, 0, 0],
+                            [0, -1, 0, 2 * floor_y],
+                            [0, 0, 1, 0],
+                            [0, 0, 0, 1],
+                        ], dtype=np.float64)
+                    )
+                    rgb_ref, _ = renderer.render_mesh(mirrored, view, proj, cam_pos, bg=bg_tuple)
+                    fade = np.clip(1.0 - drop / (0.36 * size), 0.0, 1.0)
+                    refl_rgb = (rgb_ref.astype(np.float32), np.clip(fade * 0.55 * foreground_keep, 0.0, 1.0))
+            frame_arr = _composite(rgb, alpha_prod, bg_tuple, mask, refl_rgb)
+            # 1-LSB dither kills the backdrop gradient banding on 8-bit exports
+            rng = _small_noise(frame_arr.shape[:2])
+            frame_arr = np.clip(frame_arr.astype(np.float32) + rng, 0, 255).astype(np.uint8)
+
+            frame = Image.fromarray(frame_arr, "RGBA")
             fname = f"{mesh.name}-{name}.{fmt}"
             _export(frame, out_dir / fname, fmt, flatten_color=flatten)
             outputs.append(out_dir / fname)

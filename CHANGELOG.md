@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-10-15
+
+### Changed
+
+- **Snapshot render realism overhaul** (shading/compositing):
+  - two-lobe cast shadow with a distance-based penumbra (crisp near the
+    contact, diffuse at the tail) projected in image space;
+  - wrap-around contact occlusion at the base, restricted to the product
+    footprint (no phantom darkening on the lit side);
+  - optional **floor reflection** of the product on opaque backdrops
+    (`--reflection auto|on|off`, on by default for studio/dark/sunset/colour);
+  - photographic backdrop vignette + 1-LSB dither (kills gradient banding);
+  - material sheen: broad softbox-style highlight lobe and self-occlusion
+    darkening of down-facing surfaces (under overhangs / cavities);
+  - lowered ambient so cavities read as shadowed.
+- README/demo renders regenerated with the new renderer.
+
 ## [1.1.0] - 2026-10-15
 
 ### Added

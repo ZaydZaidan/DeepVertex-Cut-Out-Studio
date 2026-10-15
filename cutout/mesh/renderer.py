@@ -29,7 +29,11 @@ out vec4 out_color;
 uniform vec4 u_bg_top;
 uniform vec4 u_bg_bot;
 void main() {
-    out_color = mix(u_bg_bot, u_bg_top, v_uv.y);
+    vec4 col = mix(u_bg_bot, u_bg_top, v_uv.y);
+    // photographic vignette on the cyclorama
+    vec2 d = v_uv - vec2(0.5);
+    col.rgb *= 1.0 - 0.12 * clamp(dot(d, d) * 2.2, 0.0, 1.0);
+    out_color = col;
 }
 """
 
@@ -79,20 +83,25 @@ void main() {
     col += u_key_col  * u_spec_str        * pow(max(dot(N, hk), 0.0), u_gloss);
     col += u_fill_col * (0.3 * u_spec_str) * pow(max(dot(N, hf), 0.0), u_gloss);
     col += u_rim_col  * (0.5 * u_spec_str) * pow(max(dot(N, hr), 0.0), u_gloss);
+    // broad "softbox" sheen (kitchen-lamp broad glossy reflection)
+    col += u_key_col  * 0.16 * pow(max(dot(N, hk), 0.0), 7.0);
 
     col = pow(clamp(col, 0.0, 1.0), vec3(1.0 / u_gamma));
+    // self-occlusion cue: surfaces facing down (under overhangs / cavities)
+    // catch almost no light in a studio — droop them carefully.
+    col *= mix(1.0, 0.80, smoothstep(0.0, -0.65, N.y));
     out_color = vec4(col, 1.0);
 }
 """
 
 #: studio 3-point rig. Tuple layout: (unit direction of travel, RGB, strength)
-KEY_LIGHT = (np.array([0.45, -0.70, 0.45]), (1.00, 0.98, 0.94), 1.00)
+KEY_LIGHT = (np.array([0.45, -0.70, 0.45]), (1.00, 0.98, 0.94), 0.92)
 FILL_LIGHT = (np.array([-0.65, -0.30, -0.10]), (0.92, 0.94, 1.00), 0.40)
 RIM_LIGHT = (np.array([-0.10, -0.40, -0.80]), (1.00, 1.00, 1.00), 0.60)
 
 #: neutral matte "product studio" material
 MATERIAL = dict(
-    color=(0.87, 0.88, 0.90), gloss=40.0, spec_str=0.35, ambient=0.34, gamma=2.2
+    color=(0.87, 0.88, 0.90), gloss=52.0, spec_str=0.45, ambient=0.26, gamma=2.2
 )
 
 BACKGROUND_PRESETS: dict[str, tuple[tuple, tuple]] = {

@@ -69,10 +69,14 @@ were validated against public docs and screenshots of the official UIs.
   neutral matte "studio clay".
 * Soft shadow: the mesh is projected along the key-light direction onto the
   floor plane at the product's lowest point, rasterised in image space with
-  the same MVP, then blurred twice — a wide soft lobe and a tight contact
-  occlusion restricted to the floor band under the product's base — and
-  composited into the frame (multiplies the backdrop, or writes shadow alpha
-  under transparent backgrounds).
+  the same MVP and composited with a **distance-based penumbra** (crisp core
+  near the contact, diffuse tail), a wrap-around contact occlusion confined
+  to the product footprint, and an optional **floor reflection** (second GL
+  pass with a mirrored mesh, faded below the base line). A 1-LSB dither and a
+  backdrop vignette give export-ready 8-bit output without gradient banding.
+* Known limit: materials are single-lobe Blinn-Phong + a broad softbox sheen —
+  true environment-based PBR (roughness maps, IBL reflections, micro-texture)
+  is the roadmap to fully photographic relighting.
 * Output: PNG (RGBA), WebP, JPG (flattened onto the background), plus an
   optional contact sheet merging all views.
 
