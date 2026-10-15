@@ -113,8 +113,32 @@ def attach_vertex_ao(mesh, rays_per_vertex: int = 64):
     np.add.at(sent, owner, 1.0)
     ao = 1.0 - np.divide(blocked, np.maximum(sent, 1e-6))
     ao = 0.25 + 0.75 * ao  # renormalise so open hemispheres stay readable
+    ao = smooth_vertex_values(mesh, ao)   # kills sampling noise
     mesh.ao_array = np.clip(ao, 0.0, 1.0).astype(np.float32)
     return mesh
+
+
+def smooth_vertex_values(mesh, values, passes: int = 2):
+    """Laplacian smoothing of per-vertex scalars over the mesh adjacency."""
+    import numpy as np
+
+    vals = np.asarray(values, dtype=np.float64).copy()
+    verts = np.arange(len(vals))
+    # build vertex→vertex adjacency from faces (cheap, once)
+    import trimesh
+    graph = trimesh.graph.vertex_adjacency_graph(mesh)
+    for _ in range(passes):
+        new = vals.copy()
+        big = 0.0
+        for v in verts:
+            nbrs = list(graph[v].keys())
+            if nbrs:
+                big = 1.0
+                new[v] = 0.5 * vals[v] + 0.5 * float(np.mean(vals[nbrs]))
+        vals = new
+        if not big:
+            break
+    return vals
 
 
 def _load_step_cadquery(p: Path):  # pragma: no cover - needs heavy optional deps

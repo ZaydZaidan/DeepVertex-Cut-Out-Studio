@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from pathlib import Path
 
@@ -26,6 +27,12 @@ def build_parser() -> argparse.ArgumentParser:
                    help="soft contact shadow (auto: on except transparent/white)")
     p.add_argument("--reflection", choices=["auto", "on", "off"], default="auto",
                    help="floor reflection (auto: on for studio/dark/sunset/colour)")
+    p.add_argument("--env-map", default=None,
+                   help="optional equirect environment image (JPEG/PNG) to drive reflections")
+    p.add_argument("--env-yaw", type=float, default=0.0,
+                   help="rotate the environment horizontally, degrees")
+    p.add_argument("--env-gain", type=float, default=1.0,
+                   help="reflected-environment strength multiplier")
     p.add_argument("--size", type=int, default=1600, help="long-edge size in px (256..4096)")
     p.add_argument("--format", dest="fmt", choices=["png", "webp", "jpg"], default="png")
     p.add_argument("--fill", type=float, default=None,
@@ -58,6 +65,9 @@ def main(argv: list[str] | None = None) -> int:
             fmt=args.fmt,
             shadow=args.shadow,
             reflection=args.reflection,
+            env_map=args.env_map,
+            env_yaw=math.radians(args.env_yaw),
+            env_gain=args.env_gain,
             fill=args.fill if args.fill is not None else DEFAULT_FILL,
             sheet=args.sheet,
         )

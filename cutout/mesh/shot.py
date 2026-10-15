@@ -233,6 +233,9 @@ def render_snapshots(
     sheet: bool = True,
     material: dict | None = None,
     reflection: str = "auto",
+    env_map: str | None = None,
+    env_yaw: float = 0.0,
+    env_gain: float = 1.0,
 ) -> list[Path]:
     """Render every requested view of *model_path* into *out_dir*.
 
@@ -284,7 +287,8 @@ def render_snapshots(
     outputs: list[Path] = []
     sheet_imgs: list[Image.Image] = []
 
-    with GLRenderer(size=(size, size)) as renderer:
+    with GLRenderer(size=(size, size), env_path=env_map) as renderer:
+        renderer.set_env(env_map, yaw=env_yaw, gain=env_gain)
         for name in views:
             view, cam_pos, kind, near, far = _camera_for(
                 mesh, name, fill=fill, spin_steps=spin_steps

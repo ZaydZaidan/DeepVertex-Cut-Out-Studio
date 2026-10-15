@@ -11,6 +11,7 @@ from __future__ import annotations
 import numpy as np
 
 from .camera import look_at, orthographic, perspective  # noqa: F401 (re-export)
+from .envmap import env_texture_array
 
 VERTEX_SRC = """
 #version 330 core
@@ -69,10 +70,16 @@ uniform float u_gamma;
 uniform vec3 u_key_dir;  uniform vec3 u_key_col;  uniform float u_key_str;
 uniform vec3 u_fill_dir; uniform vec3 u_fill_col; uniform float u_fill_str;
 uniform vec3 u_rim_dir;  uniform vec3 u_rim_col;  uniform float u_rim_str;
+uniform sampler2D u_env;
+uniform float u_env_yaw;
+uniform float u_env_gain;
 in float v_ao;
 
-float hash21(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+// equirect lookup for a direction (yaw rotates the map around +Y)
+vec2 equirect(vec3 d) {
+    float az = atan(d.x, d.z) - u_env_yaw;
+    float el = asin(clamp(d.y, -1.0, 1.0));
+    return vec2(az / (2.0 * 3.14159265) + 0.5, el / 3.14159265 + 0.5);
 }
 
 void main() {
@@ -80,34 +87,19 @@ void main() {
     vec3 V = normalize(u_view_pos - v_pos);
     float ndv = max(dot(N, V), 1e-4);
 
-    // micro surface variation: procedural (screen-stable) albedo/roughness noise
-    float g = hash21(floor(gl_FragCoord.xy * 0.75));
+    // micro surface variation (tiny, keeps large surfaces from looking flat)
+    float g = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
     vec3 albedo = u_color * (0.995 + 0.02 * (g - 0.5));
-    float rough = 0.18 + 0.05 * (g - 0.5);
+    float rough = 0.13;
 
     // Fresnel (Schlick, dielectric)
     float F = 0.045 + 0.955 * pow(1.0 - ndv, 5.0);
 
-    // analytic studio environment (IBL-lite) sampled along the reflection:
-    // sky gradient + darker floor bounce + a bright softbox band upper-front
+    // real environment lookup (bitmap equirect — reflections pick up *shape*)
     vec3 R = reflect(-V, N);
-    float up = clamp(R.y * 0.5 + 0.5, 0.0, 1.0);
-    vec3 env = mix(vec3(0.60, 0.62, 0.66), vec3(0.96, 0.97, 0.99), smoothstep(0.30, 0.92, up));
-    env = mix(env, vec3(0.50, 0.51, 0.54), smoothstep(0.52, 0.30, up) * 0.6);
-    vec3 soft_axis = normalize(vec3(0.42, 0.62, 0.42));
-    // elongate horizontally so the reflected strip reads as a softbox band
-    vec3 R_stretch = vec3(R.x * 0.38, R.y, R.z * 0.38);
-    float softbox = smoothstep(0.80, 0.99, dot(normalize(R_stretch + 1e-6), soft_axis));
-    env += vec3(1.00, 0.99, 0.97) * softbox * 2.6;
-    // second, lower softbox strip at the horizon (front) — gives tall surfaces
-    // their own vertical reflection streak
-    float frontness = smoothstep(-0.05, 0.85, dot(R, normalize(vec3(0.0, 0.10, 1.0))));
-    env += vec3(0.96, 0.96, 0.95) * 1.25
-         * smoothstep(0.20, 0.05, abs(R.y - 0.02)) * frontness;
-
-    // reflection: blurred by roughness (dim + desaturate), Fresnel-weighted
-    vec3 env_blur = mix(env, vec3(dot(env, vec3(0.3333))), rough * 0.55);
-    vec3 refl = env_blur * F * (1.0 - 0.30 * rough);
+    float lod = clamp(rough * 7.0, 0.20, 2.0);
+    vec3 env_r = textureLod(u_env, equirect(R), lod).rgb;
+    vec3 refl = env_r * u_env_gain * F * (1.0 - 0.30 * rough);
 
     vec3 col = albedo * u_ambient;
     col += u_key_col  * u_key_str  * max(dot(N, -u_key_dir), 0.0)  * albedo;
@@ -164,7 +156,7 @@ def create_context():
 class GLRenderer:
     """Renders one triangle-mesh view per call into an RGBA canvas."""
 
-    def __init__(self, size: tuple[int, int] = (1600, 1600)) -> None:
+    def __init__(self, size: tuple[int, int] = (1600, 1600), env_path=None) -> None:
         self.ctx = create_context()
         self.size = size
         self._mesh_prog = self.ctx.program(vertex_shader=VERTEX_SRC, fragment_shader=FRAGMENT_SRC)
@@ -175,6 +167,23 @@ class GLRenderer:
         self._bg_vao = self.ctx.vertex_array(
             self._bg_prog, [(quad, "2f", "in_pos")], mode=self.ctx.TRIANGLE_STRIP
         )
+        self._env_tex = None
+        self.set_env(env_path)
+
+    # ------------------------------------------------------------------- env
+    def set_env(self, env_path=None, yaw: float = 0.0, gain: float = 1.0) -> None:
+        """Load an equirect environment (user file or bundled default)."""
+        import numpy as np
+
+        arr = env_texture_array(env_path)
+        tex = self.ctx.texture((arr.shape[1], arr.shape[0]), components=3, dtype="f1")
+        tex.write((np.clip(arr, 0.0, 1.0) * 255).astype(np.uint8).tobytes())
+        tex.filter = (self.ctx.LINEAR_MIPMAP_LINEAR, self.ctx.LINEAR)
+        tex.repeat_x = True
+        tex.build_mipmaps()
+        self._env_tex = tex
+        self._env_yaw = float(yaw)
+        self._env_gain = float(gain)
 
     # ------------------------------------------------------------------ mesh
     @staticmethod
@@ -254,6 +263,11 @@ class GLRenderer:
         pr["u_rim_dir"].value = tuple(RIM_LIGHT[0])
         pr["u_rim_col"].value = RIM_LIGHT[1]
         pr["u_rim_str"].value = RIM_LIGHT[2]
+        if self._env_tex is not None:
+            self._env_tex.use(location=1)
+            pr["u_env"].value = 1
+            pr["u_env_yaw"].value = self._env_yaw
+            pr["u_env_gain"].value = self._env_gain
         vao.render()
 
         raw = np.flipud(np.frombuffer(fbo.read(components=4), dtype=np.uint8).reshape(h, w, 4))

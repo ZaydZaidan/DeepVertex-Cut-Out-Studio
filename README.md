@@ -204,6 +204,7 @@ Examples:
 | `--bg-color` | `#ffffff` | colour for `--bg color` |
 | `--shadow` | `auto` | `on` / `off` / `auto` (auto: on for studio/dark/sunset/color) |
 | `--reflection` | `auto` | floor reflection under the product (`auto`: on for studio/dark/sunset/colour backgrounds) |
+| `--env-map` / `--env-yaw` / `--env-gain` | bundled studio / 0 / 1.0 | equirect environment (JPEG/PNG) driving reflections — bring your own studio; yaw rotates it, gain scales its influence |
 | `--size` | `1600` | output pixel size (square) |
 | `--format` | `png` | `png` / `webp` / `jpg` |
 | `--fill` | `0.85` | subject fill fraction of the frame (Amazon main-image rule = 0.85) |

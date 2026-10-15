@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-10-15
+
+### Added
+
+- **Bitmap environment map (IBL-lite v2)** — reflections now sample a real
+  equirect environment texture (`cutout/mesh/envmap.py`): a synthesised
+  studio (sky gradient, ceiling softbox with shaped edges, horizon strip,
+  subdued floor), with mipmapped roughness-driven blur via `textureLod`.
+  Users can drop in their own studio (HDRI/JPEG/PNG) with
+  `--env-map PATH [--env-yaw DEG] [--env-gain F]`; bundled asset at
+  `assets/env/studio-equirect.png`.
+  Reflections now pick up the *shape* of the light sources — the softbox
+  reads as a strip with edges instead of an analytic gradient smear.
+
+### Changed
+
+- Vertex ambient occlusion smoothed over mesh adjacency (kills ray-sampling
+  noise); 64 rays/vertex default; roughness 0.13; reflection LOD capped low
+  for defined highlight edges.
+- Renderer gotchas & tuning recipe documented in the repo
+  ([docs/3D_SNAPSHOT_RECON.md](docs/3D_SNAPSHOT_RECON.md)).
+
 ## [1.1.2] - 2026-10-15
 
 ### Changed
