@@ -268,3 +268,5 @@ widget-state/geometry tooling rather than screenshots alone.
 - The algorithmic knowledge of the pipeline was informed by observing the
   public remove.bg web workflow; remove.bg is a trademark of its owner and is
   not affiliated with, nor endorsing, this project.
+- Demo montage photo: from [Pexels](https://www.pexels.com) (free Pexels
+  licence, no attribution required — credit given anyway).
