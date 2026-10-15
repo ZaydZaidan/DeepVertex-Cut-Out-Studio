@@ -30,6 +30,22 @@ No uploads. No accounts. No credits. No watermark. Ever.
 
 ---
 
+## The interface
+
+<div align="center">
+
+<img src="assets/screenshots/gui_main.png" alt="Main window after a batch: image queue, live before/after cutout preview on a transparency checkerboard, settings inspector" width="920"/>
+
+*Drop photos in (or a 3D model): queue them, preview before/after live, one click — and every control has a tooltip.*
+
+<img src="assets/screenshots/gui_mesh_dialog.png" alt="3D Product Snapshot dialog: model path, view sets, background options, image size and output folder"/>
+
+*3D Product Snapshot (`Ctrl+M`): a CAD file in, a full webshop shot set out.*
+
+</div>
+
+---
+
 ## Why pay for pixels twice?
 
 Cloud removers work well — but they bind you to quotas, quality tiers,

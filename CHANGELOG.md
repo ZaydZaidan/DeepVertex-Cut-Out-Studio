@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- README: added a **"The interface"** section — the repo page now presents
+  the app itself: a fresh main-window screenshot (completed batch, live
+  before/after preview) and the 3D Product Snapshot dialog. Regenerated
+  with `scripts/ux_audit.py`; the dialog shot comes from the new
+  `scripts/capture_mesh_dialog.py`.
+
 ## [1.2.1] - 2026-10-15
 
 ### Fixed
