@@ -12,6 +12,10 @@ if [[ "${1:-}" == "cli" ]]; then
     shift
     exec venv/bin/python -m cutout.cli "$@"
 fi
+if [[ "${1:-}" == "mesh" ]]; then
+    shift
+    exec venv/bin/python -m cutout.meshcli "$@"
+fi
 # GUI launches from the desktop entry have no terminal: keep a log so failures
 # are diagnosable (e.g. missing system libraries).
 mkdir -p "$HOME/.cache/cutout-studio"

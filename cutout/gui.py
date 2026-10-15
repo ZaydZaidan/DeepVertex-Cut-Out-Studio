@@ -260,7 +260,12 @@ class MainWindow(QMainWindow):
         act_all = QAction("Process A&ll", self)
         act_all.setShortcut(QKeySequence("Ctrl+Shift+Return"))
         act_all.triggered.connect(lambda: self._start(only_selected=False))
+        act_mesh = QAction("3D Product &Snapshot…", self)
+        act_mesh.setShortcut(QKeySequence("Ctrl+M"))
+        act_mesh.triggered.connect(self._open_mesh_snapshot)
         process_menu.addActions([act_selected, act_all])
+        process_menu.addSeparator()
+        process_menu.addAction(act_mesh)
 
         help_menu = self.menuBar().addMenu("&Help")
         act_about = QAction("&About", self)
@@ -752,8 +757,26 @@ class MainWindow(QMainWindow):
     def dropEvent(self, event) -> None:  # noqa: N802
         paths = [u.toLocalFile() for u in event.mimeData().urls() if u.isLocalFile()]
         if paths:
-            self._add_paths(paths)
+            from .snapshot_dialog import MeshSnapshotDialog
+
+            threed = {".stl", ".obj", ".ply", ".glb", ".gltf", ".step", ".stp", ".f3d", ".f3z"}
+            models = [p for p in paths if Path(p).suffix.lower() in threed]
+            images = [p for p in paths if Path(p).suffix.lower() not in threed]
+            if models:
+                dlg = MeshSnapshotDialog(self)
+                dlg.model_edit.setText(models[0])
+                dlg.out_edit.setText(
+                    str(Path(models[0]).parent / (Path(models[0]).stem + "-shots"))
+                )
+                dlg.show()
+            if images:
+                self._add_paths(images)
             event.acceptProposedAction()
+
+    def _open_mesh_snapshot(self) -> None:
+        from .snapshot_dialog import MeshSnapshotDialog
+
+        MeshSnapshotDialog(self).show()
 
 
 def main() -> int:

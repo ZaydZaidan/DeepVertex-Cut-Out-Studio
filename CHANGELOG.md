@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-10-15
+
+### Added
+
+- **3D Product Snapshot renderer** (`cutout.mesh`, CLI `cutout-mesh`,
+  GUI *Process ▸ 3D Product Snapshot…*): renders web-shop-ready product
+  images straight from **STEP / STL / OBJ / PLY / GLB** models. Six CAD
+  views (orthographic), 3/4 *hero* angles, turntable spins, five background
+  modes (transparent / pure-white / studio / dark / sunset / custom colour),
+  two-lobe soft contact shadow, product-fill framing (85 % default), PNG /
+  WebP / JPG output and a contact sheet. Headless GPU OpenGL (moderngl EGL,
+  OSMesa/GLX fallback). Study: `docs/3D_SNAPSHOT_RECON.md`.
+- Drag & drop of 3D files onto the picture window opens the snapshot dialog.
+- Optional extra `[step]` (cadquery/OpenCASCADE) enables STEP import;
+  Fusion `.f3d` files get an actionable export-guide error.
+
 ## [1.0.0] - 2026-10-15
 
 ### Added

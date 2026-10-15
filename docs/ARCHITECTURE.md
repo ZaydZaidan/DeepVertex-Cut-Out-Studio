@@ -12,7 +12,14 @@ cutout/
 ├── compose.py     # composition: backgrounds, drop shadow, export encoders
 ├── pipeline.py    # process_file(): the single per-file entry both frontends call
 ├── cli.py         # argparse CLI over process_file (files or directories)
-└── gui.py         # PySide6 desktop app (queue, preview, background worker)
+├── gui.py         # PySide6 desktop app (queue, preview, background worker)
+├── meshcli.py     # CLI for the 3D product-snapshot renderer
+├── snapshot_dialog.py  # GUI dialog: 3D model -> snapshot set
+└── mesh/
+    ├── camera.py    # view presets, look-at / persp / ortho maths
+    ├── io.py        # mesh loading STL/OBJ/PLY/GLB (+ STEP via cadquery optional)
+    ├── renderer.py  # moderngl headless renderer (EGL→OSMesa→GLX), light rig
+    └── shot.py      # framing/fill, contact-shadow compositing, export
 scripts/
 ├── gui_smoke.py       # offscreen end-to-end GUI exercise via the real worker
 ├── quality_check.py   # visual QA montage: original | white | magenta per image

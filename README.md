@@ -44,6 +44,17 @@ free because your own GPU does the work.
   (BRIA, non-commercial, gated), via Hugging Face `transformers`, running on
   CUDA (tested on an RTX 5050, `sm_120`) with automatic CPU fallback.
   Choices of inference resolution: **Fast / Balanced / Max** (768 / 1024 / 1536 px).
+- **3D Product Snapshot** (new in 1.1.0) — turn a **STEP / STL / OBJ / PLY /
+  GLB** model into a full set of webshop-ready images: the six CAD views,
+  the 3/4 *hero* angles, custom turntable spins, on a **transparent** canvas,
+  a **pure-white** Amazon-style main image, a **studio** gradient with soft
+  contact shadow, dark/sunset backdrops, or any solid colour. Rendering is
+  local GPU/OpenGL — study in [`docs/3D_SNAPSHOT_RECON.md`](docs/3D_SNAPSHOT_RECON.md).
+
+| ![3D snapshot — studio](assets/screenshots/mesh-studio.png) | ![3D snapshot — white](assets/screenshots/mesh-white.png) | ![3D snapshot — transparent](assets/screenshots/mesh-transparent.jpg) |
+|---|---|---|
+| Studio gradient | Pure-white main image | Transparent + shadow (checker preview) |
+
 - **Edge quality controls** — guided-filter alpha refinement (fast, default) or
   closed-form alpha matting via [pymatting](https://github.com/pymatting/pymatting)
   (best hair/glass edges, slower, auto-skipped above ~4 MP), edge feathering,
@@ -130,6 +141,10 @@ Launch `./run.sh` (or the desktop entry *DeepVertex Cut-Out Studio*):
    (`Ctrl+Shift+Return`); progress and per-file results appear in the queue.
 4. Outputs land beside the inputs (suffix `-nobg`) or in the folder you set.
 
+**3D Product Snapshot** (`Ctrl+M`): drag a `.stl/.obj/.step/.glb` model file
+onto the window (or open the dialog from the *Process* menu), choose the view
+set, background and size, and render — no manual screenshots required.
+
 ### CLI
 
 ```bash
@@ -173,6 +188,28 @@ Examples:
 ./run.sh cli product.png -o out/ --bg color --bg-color '#0b0b0c' \
         --format jpg --shadow --shadow-opacity 0.4
 ```
+
+### CLI — 3D product snapshots
+
+```bash
+./run.sh mesh MODEL.stl -o shots/ [--views ...] [--bg ...] [...]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| (positional) `MODEL` | — | `.stl, .obj, .ply, .glb, .gltf` (native); `.step` needs the optional `[step]` extra; `.f3d` is not readable — export it from Fusion first |
+| `--views` | `standard` | `standard` (6 CAD views + 2 hero) · `all` (6 + 4 hero) · `ortho` · `hero` · comma list · `turntable:N` (4–72) |
+| `--bg` | `studio` | `studio` (gradient + contact shadow) · `white` (pure 255, no shadow — Amazon main image) · `transparent` (alpha PNG/WebP) · `dark` · `sunset` · `color` |
+| `--bg-color` | `#ffffff` | colour for `--bg color` |
+| `--shadow` | `auto` | `on` / `off` / `auto` (auto: on for studio/dark/sunset/color) |
+| `--size` | `1600` | output pixel size (square) |
+| `--format` | `png` | `png` / `webp` / `jpg` |
+| `--fill` | `0.85` | subject fill fraction of the frame (Amazon main-image rule = 0.85) |
+| `-o DIR` | `<model>-shots` | output folder |
+
+Filename layout: `{model}-{view}.png` (e.g. `bracket-hero-front-left.png`)
+plus `{model}-sheet.jpg`, a contact sheet of all views. Ideal for
+marketplace galleries, turntable spins, and pre-manufacture branding.
 
 ## Models
 
