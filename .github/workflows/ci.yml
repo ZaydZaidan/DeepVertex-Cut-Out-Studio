@@ -54,4 +54,6 @@ jobs:
         run: |
           python -m venv /tmp/verify
           /tmp/verify/bin/pip install dist/*.whl --no-deps
+          # the import check needs the light runtime deps (lazy torch is fine)
+          /tmp/verify/bin/pip install numpy Pillow scipy pymatting
           /tmp/verify/bin/python -c "import cutout, cutout.cli, cutout.compose, cutout.refine, cutout.pipeline; print('import ok', cutout.__version__)"
