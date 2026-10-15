@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "deepvertex-cutout-studio"
-version = "1.1.1"
+version = "1.1.2"
 description = "Local, GPU-accelerated AI background remover + 3D product-snapshot renderer — clean-room reconstruction of the remove.bg workflow (BiRefNet / RMBG-2.0); STEP/STL models to web-ready studio shots."
 readme = "README.md"
 license = { text = "MIT" }

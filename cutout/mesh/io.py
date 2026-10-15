@@ -68,6 +68,55 @@ def _load_step(p: Path):
     return _load_step_cadquery(p)
 
 
+def attach_vertex_ao(mesh, rays_per_vertex: int = 64):
+    """Compute hemisphere-traced ambient occlusion per vertex (bvh-free).
+
+    Classic darkening-for-concavity: each vertex shoots outward rays; blocked
+    portions darken it. blend factor lands in ``mesh.ao_array`` (0=closed
+    cavity, 1=open). The renderer multiplies the fragment colour by it.
+    """
+    import numpy as np
+
+    if getattr(mesh, "ao_array", None) is not None:
+        return mesh
+    import trimesh
+
+    verts = np.asarray(mesh.vertices, dtype=np.float64)
+    nv = len(verts)
+    nbuf = np.asarray(mesh.vertex_normals, dtype=np.float64)
+    rng = np.random.default_rng(11)
+    inter = trimesh.ray.ray_triangle.RayMeshIntersector(mesh)
+    origin_stack, dir_stack, owner = [], [], []
+    for i in range(nv):
+        d = rng.normal(size=(rays_per_vertex, 3))
+        d /= np.linalg.norm(d, axis=1, keepdims=True)
+        # keep the hemisphere facing along the vertex normal
+        keep = d @ nbuf[i] > 0.0
+        d = d[keep]
+        if not len(d):
+            continue
+        o = np.repeat(verts[i : i + 1] + nbuf[i : i + 1] * 1e-4, len(d), axis=0)
+        origin_stack.append(o)
+        dir_stack.append(d)
+        owner.append(np.full(len(d), i, dtype=np.int64))
+    if not owner:
+        mesh.ao_array = np.ones(nv, dtype=np.float32)
+        return mesh
+    origins = np.concatenate(origin_stack)
+    dirs = np.concatenate(dir_stack)
+    owner = np.concatenate(owner)
+    # mark occlusion: any hit closer than a generous max range
+    hit_any = inter.intersects_any(origins, dirs)
+    blocked = np.zeros(nv, dtype=np.float32)
+    np.add.at(blocked, owner[hit_any], 1.0)
+    sent = np.zeros(nv, dtype=np.float32)
+    np.add.at(sent, owner, 1.0)
+    ao = 1.0 - np.divide(blocked, np.maximum(sent, 1e-6))
+    ao = 0.25 + 0.75 * ao  # renormalise so open hemispheres stay readable
+    mesh.ao_array = np.clip(ao, 0.0, 1.0).astype(np.float32)
+    return mesh
+
+
 def _load_step_cadquery(p: Path):  # pragma: no cover - needs heavy optional deps
     import logging
 

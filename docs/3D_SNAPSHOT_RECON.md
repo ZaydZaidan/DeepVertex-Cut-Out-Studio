@@ -64,9 +64,13 @@ were validated against public docs and screenshots of the official UIs.
 * Headless OpenGL via **moderngl** (EGL → OSMesa → GLX probing) — no window
   server required, GPU-accelerated when a driver is present (verified on an
   NVIDIA RTX 5050; CPU fallback via OSMesa when available).
-* Materials: uniforms key/fill/rim directions + colours + strengths, ambient
-  floor, Blinn-Phong specular, gamma correction. Default material is a
-  neutral matte "studio clay".
+* Materials (v1.1.2): analytic studio **environment reflection (IBL-lite)**
+  with Fresnel (Schlick) weighting, an elongated upper softbox band plus a
+  horizon strip, two-lobe specular anchors (tight 180-power core + 96-power
+  band), and **vertex-traced ambient occlusion** (hemisphere ray casting per
+  vertex, cached on the mesh; the shader multiplies the fragment colour by
+  it) — bores, cavities and under-overhang areas darken physically. A
+  depth-buffer screen-space AO pass smooths crease/edge occlusion further.
 * Soft shadow: the mesh is projected along the key-light direction onto the
   floor plane at the product's lowest point, rasterised in image space with
   the same MVP and composited with a **distance-based penumbra** (crisp core
@@ -74,9 +78,9 @@ were validated against public docs and screenshots of the official UIs.
   to the product footprint, and an optional **floor reflection** (second GL
   pass with a mirrored mesh, faded below the base line). A 1-LSB dither and a
   backdrop vignette give export-ready 8-bit output without gradient banding.
-* Known limit: materials are single-lobe Blinn-Phong + a broad softbox sheen —
-  true environment-based PBR (roughness maps, IBL reflections, micro-texture)
-  is the roadmap to fully photographic relighting.
+* Known limit: the env is analytic (two light bands + gradient sky), not a
+  real HDRI; roughness is per-pixel procedural — true texture maps and
+  fully photographic relighting remain the roadmap (v1.2 plan).
 * Output: PNG (RGBA), WebP, JPG (flattened onto the background), plus an
   optional contact sheet merging all views.
 

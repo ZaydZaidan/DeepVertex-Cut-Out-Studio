@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2026-10-15
+
+### Changed
+
+- **Materials: env-aware reflectance** — analytic environment (IBL-lite)
+  reflection lobe with Fresnel weighting (Schlick dielectric), an elongated
+  upper "softbox" band and a horizon strip that gives tall surfaces a
+  vertical reflection streak; roughness lowered for defined specular anchors.
+- **Cavity / depth shading** — real vertex-traced ambient occlusion
+  (hemisphere ray casting, cached on the mesh) uploaded as a per-vertex
+  attribute: bores, under-overhang areas and recessed cavities darken
+  physically instead of heuristic patches. Depth-buffer screen-space AO pass
+  additionally smooths crease/edge occlusion.
+- Specular anchors: two-lobe spec (tight 180-power core + 96-power band) so
+  smooth CAD parts catch defined highlights.
+
 ## [1.1.1] - 2026-10-15
 
 ### Changed

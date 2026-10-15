@@ -12,6 +12,23 @@ import numpy as np
 
 from .camera import look_at, orthographic, perspective  # noqa: F401 (re-export)
 
+VERTEX_SRC = """
+#version 330 core
+in vec3 in_pos;
+in vec3 in_normal;
+in float in_ao;
+uniform mat4 u_mvp;
+out vec3 v_pos;
+out vec3 v_normal;
+out float v_ao;
+void main() {
+    v_pos = in_pos;            // world space: the model transform is baked in
+    v_normal = in_normal;
+    v_ao = in_ao;
+    gl_Position = u_mvp * vec4(in_pos, 1.0);
+}
+"""
+
 BG_VERTEX_SRC = """
 #version 330 core
 in vec2 in_pos;
@@ -30,24 +47,9 @@ uniform vec4 u_bg_top;
 uniform vec4 u_bg_bot;
 void main() {
     vec4 col = mix(u_bg_bot, u_bg_top, v_uv.y);
-    // photographic vignette on the cyclorama
     vec2 d = v_uv - vec2(0.5);
     col.rgb *= 1.0 - 0.12 * clamp(dot(d, d) * 2.2, 0.0, 1.0);
     out_color = col;
-}
-"""
-
-VERTEX_SRC = """
-#version 330 core
-in vec3 in_pos;
-in vec3 in_normal;
-uniform mat4 u_mvp;
-out vec3 v_pos;
-out vec3 v_normal;
-void main() {
-    v_pos = in_pos;            // world space: the model transform is baked in
-    v_normal = in_normal;
-    gl_Position = u_mvp * vec4(in_pos, 1.0);
 }
 """
 
@@ -59,49 +61,78 @@ out vec4 out_color;
 
 uniform vec3  u_view_pos;
 uniform vec3  u_color;
-uniform float u_gloss;      // specular exponent
-uniform float u_spec_str;   // specular strength
+uniform float u_gloss;      // specular exponent (tight glints)
+uniform float u_spec_str;   // specular strength (tight glints)
 uniform float u_ambient;    // ambient base
 uniform float u_gamma;
 
 uniform vec3 u_key_dir;  uniform vec3 u_key_col;  uniform float u_key_str;
 uniform vec3 u_fill_dir; uniform vec3 u_fill_col; uniform float u_fill_str;
 uniform vec3 u_rim_dir;  uniform vec3 u_rim_col;  uniform float u_rim_str;
+in float v_ao;
+
+float hash21(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
 
 void main() {
     vec3 N = normalize(v_normal);
     vec3 V = normalize(u_view_pos - v_pos);
+    float ndv = max(dot(N, V), 1e-4);
 
-    vec3 col = u_color * u_ambient;
-    col += u_key_col  * u_key_str  * max(dot(N, -u_key_dir), 0.0)  * u_color;
-    col += u_fill_col * u_fill_str * max(dot(N, -u_fill_dir), 0.0) * u_color;
-    col += u_rim_col  * u_rim_str  * max(dot(N, -u_rim_dir), 0.0)  * u_color;
+    // micro surface variation: procedural (screen-stable) albedo/roughness noise
+    float g = hash21(floor(gl_FragCoord.xy * 0.75));
+    vec3 albedo = u_color * (0.995 + 0.02 * (g - 0.5));
+    float rough = 0.18 + 0.05 * (g - 0.5);
 
-    vec3 hk = normalize(-u_key_dir  + V);
-    vec3 hf = normalize(-u_fill_dir + V);
-    vec3 hr = normalize(-u_rim_dir  + V);
-    col += u_key_col  * u_spec_str        * pow(max(dot(N, hk), 0.0), u_gloss);
-    col += u_fill_col * (0.3 * u_spec_str) * pow(max(dot(N, hf), 0.0), u_gloss);
-    col += u_rim_col  * (0.5 * u_spec_str) * pow(max(dot(N, hr), 0.0), u_gloss);
-    // broad "softbox" sheen (kitchen-lamp broad glossy reflection)
-    col += u_key_col  * 0.16 * pow(max(dot(N, hk), 0.0), 7.0);
+    // Fresnel (Schlick, dielectric)
+    float F = 0.045 + 0.955 * pow(1.0 - ndv, 5.0);
 
-    col = pow(clamp(col, 0.0, 1.0), vec3(1.0 / u_gamma));
-    // self-occlusion cue: surfaces facing down (under overhangs / cavities)
-    // catch almost no light in a studio — droop them carefully.
+    // analytic studio environment (IBL-lite) sampled along the reflection:
+    // sky gradient + darker floor bounce + a bright softbox band upper-front
+    vec3 R = reflect(-V, N);
+    float up = clamp(R.y * 0.5 + 0.5, 0.0, 1.0);
+    vec3 env = mix(vec3(0.60, 0.62, 0.66), vec3(0.96, 0.97, 0.99), smoothstep(0.30, 0.92, up));
+    env = mix(env, vec3(0.50, 0.51, 0.54), smoothstep(0.52, 0.30, up) * 0.6);
+    vec3 soft_axis = normalize(vec3(0.42, 0.62, 0.42));
+    // elongate horizontally so the reflected strip reads as a softbox band
+    vec3 R_stretch = vec3(R.x * 0.38, R.y, R.z * 0.38);
+    float softbox = smoothstep(0.80, 0.99, dot(normalize(R_stretch + 1e-6), soft_axis));
+    env += vec3(1.00, 0.99, 0.97) * softbox * 2.6;
+    // second, lower softbox strip at the horizon (front) — gives tall surfaces
+    // their own vertical reflection streak
+    float frontness = smoothstep(-0.05, 0.85, dot(R, normalize(vec3(0.0, 0.10, 1.0))));
+    env += vec3(0.96, 0.96, 0.95) * 1.25
+         * smoothstep(0.20, 0.05, abs(R.y - 0.02)) * frontness;
+
+    // reflection: blurred by roughness (dim + desaturate), Fresnel-weighted
+    vec3 env_blur = mix(env, vec3(dot(env, vec3(0.3333))), rough * 0.55);
+    vec3 refl = env_blur * F * (1.0 - 0.30 * rough);
+
+    vec3 col = albedo * u_ambient;
+    col += u_key_col  * u_key_str  * max(dot(N, -u_key_dir), 0.0)  * albedo;
+    col += u_fill_col * u_fill_str * max(dot(N, -u_fill_dir), 0.0) * albedo;
+    col += u_rim_col  * u_rim_str  * max(dot(N, -u_rim_dir), 0.0)  * albedo;
+    col += refl;
+
+    // tight glint on top of the env reflection (tiny, physical sparkle)
+    vec3 hk = normalize(-u_key_dir + V);
+    col += u_key_col * (u_spec_str * 0.55 * pow(max(dot(N, hk), 0.0), u_gloss)
+                      + u_spec_str * 0.25 * pow(max(dot(N, hk), 0.0), 180.0));
+
+    col = pow(clamp(col, 0.0, 1.0), vec3(1.0 / u_gamma)) * mix(0.62, 1.0, clamp(v_ao, 0.0, 1.0));
+    // self-occlusion: down-facing surfaces see almost nothing in a studio
     col *= mix(1.0, 0.80, smoothstep(0.0, -0.65, N.y));
     out_color = vec4(col, 1.0);
 }
-"""
-
-#: studio 3-point rig. Tuple layout: (unit direction of travel, RGB, strength)
+"""#: studio 3-point rig. Tuple layout: (unit direction of travel, RGB, strength)
 KEY_LIGHT = (np.array([0.45, -0.70, 0.45]), (1.00, 0.98, 0.94), 0.92)
 FILL_LIGHT = (np.array([-0.65, -0.30, -0.10]), (0.92, 0.94, 1.00), 0.40)
 RIM_LIGHT = (np.array([-0.10, -0.40, -0.80]), (1.00, 1.00, 1.00), 0.60)
 
 #: neutral matte "product studio" material
 MATERIAL = dict(
-    color=(0.87, 0.88, 0.90), gloss=52.0, spec_str=0.45, ambient=0.26, gamma=2.2
+    color=(0.87, 0.88, 0.90), gloss=96.0, spec_str=0.70, ambient=0.26, gamma=2.2
 )
 
 BACKGROUND_PRESETS: dict[str, tuple[tuple, tuple]] = {
@@ -152,12 +183,19 @@ class GLRenderer:
 
         positions = np.asarray(mesh.vertices, dtype=np.float32)
         normals = np.asarray(mesh.vertex_normals, dtype=np.float32)
+        ao_raw = getattr(mesh, "ao_array", None)
+        ao = (
+            np.asarray(ao_raw, dtype=np.float32)
+            if ao_raw is not None and np.ndim(ao_raw) == 1
+               and np.asarray(ao_raw).size == len(positions)
+            else np.ones(len(positions), dtype=np.float32)
+        )
         faces = np.asarray(mesh.faces, dtype=np.uint32)
         v0 = positions[faces[:, 0]]
         v1 = positions[faces[:, 1]]
         v2 = positions[faces[:, 2]]
         keep = np.linalg.norm(np.cross(v1 - v0, v2 - v0), axis=1) > 1e-12
-        return positions, normals, faces[keep]
+        return positions, normals, ao, faces[keep]
 
     def render_mesh(
         self,
@@ -175,8 +213,8 @@ class GLRenderer:
         w, h = self.size
         fbo_tex = self.ctx.texture((w, h), components=4, dtype="f1")
         fbo_tex.filter = (self.ctx.LINEAR, self.ctx.LINEAR)
-        depth = self.ctx.depth_renderbuffer((w, h))
-        fbo = self.ctx.framebuffer(color_attachments=[fbo_tex], depth_attachment=depth)
+        depth_tex = self.ctx.depth_texture((w, h))
+        fbo = self.ctx.framebuffer(color_attachments=[fbo_tex], depth_attachment=depth_tex)
         fbo.use()
         fbo.clear(0.0, 0.0, 0.0, 1.0 if bg is not None else 0.0)
         self.ctx.enable(self.ctx.DEPTH_TEST)
@@ -186,13 +224,14 @@ class GLRenderer:
             self._bg_prog["u_bg_bot"].value = tuple(bg[1])
             self._bg_vao.render()
 
-        positions, normals, indices = self._mesh_arrays(mesh)
+        positions, normals, ao_vals, indices = self._mesh_arrays(mesh)
         vbo = self.ctx.buffer(positions.tobytes())
         nbo = self.ctx.buffer(normals.tobytes())
+        abo = self.ctx.buffer(ao_vals.tobytes())
         ibo = self.ctx.buffer(indices.tobytes())
         vao = self.ctx.vertex_array(
             self._mesh_prog,
-            [(vbo, "3f", "in_pos"), (nbo, "3f", "in_normal")],
+            [(vbo, "3f", "in_pos"), (nbo, "3f", "in_normal"), (abo, "1f", "in_ao")],
             ibo,
         )
         pr = self._mesh_prog
@@ -220,9 +259,13 @@ class GLRenderer:
         raw = np.flipud(np.frombuffer(fbo.read(components=4), dtype=np.uint8).reshape(h, w, 4))
         rgb = raw[:, :, :3].copy()
         alpha = raw[:, :, 3].astype(np.float32) / 255.0
+        try:
+            d = np.flipud(np.frombuffer(depth_tex.read(), dtype=np.float32).reshape(h, w))
+        except Exception:  # noqa: BLE001 - depth readback optional
+            d = None
         fbo.release()
         fbo_tex.release()
-        return rgb, alpha
+        return rgb, alpha, d
 
     def release(self) -> None:
         try:

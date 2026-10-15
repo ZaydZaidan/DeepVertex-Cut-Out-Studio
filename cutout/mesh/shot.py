@@ -22,7 +22,7 @@ from .camera import (
     orthographic,
     perspective,
 )
-from .io import load_mesh  # noqa: F401 (re-export)
+from .io import attach_vertex_ao, load_mesh  # noqa: F401 (re-export)
 from .renderer import BACKGROUND_PRESETS
 
 log = logging.getLogger(__name__)
@@ -164,6 +164,18 @@ def _export(img: Image.Image, path: Path, fmt: str, flatten_color=(255, 255, 255
         raise ValueError(f"unsupported format {fmt!r}")
 
 
+def _blur(a, rad):
+    """Gaussian blur a float mask/matrix via PIL (values clipped to 0..1)."""
+    import numpy as _np
+    a = _np.clip(a, 0.0, 1.0)
+    return _np.asarray(
+        Image.fromarray((a * 255).astype(np.uint8)).filter(
+            ImageFilter.GaussianBlur(radius=float(rad))
+        ),
+        dtype=np.float32,
+    ) / 255.0
+
+
 def _small_noise(shape, strength=0.8):
     """Blue-ish uniform dither (adds grain ~1 LSB to kill gradient banding)."""
     rng = np.random.default_rng(7)
@@ -246,7 +258,7 @@ def render_snapshots(
         size += 1
 
     views, spin_steps = resolve_views(views_spec)
-    mesh = load_mesh(model_path)
+    mesh = attach_vertex_ao(load_mesh(model_path))
 
     if bg == "transparent":
         bg_tuple, shadow_on = None, False
@@ -284,7 +296,7 @@ def render_snapshots(
                     half_height=float(np.linalg.norm(mesh.extents)) * 0.5 / fill,
                     aspect=1.0, near=near, far=far,
                 )
-            rgb, alpha = renderer.render_mesh(mesh, view, proj, cam_pos, bg=bg_tuple)
+            rgb, alpha, depth = renderer.render_mesh(mesh, view, proj, cam_pos, bg=bg_tuple)
 
             # product silhouette (needed to keep the shadow off the product
             # and for transparent mode alpha). In bg-transparent mode the GL
@@ -293,7 +305,7 @@ def render_snapshots(
             if bg_tuple is None:
                 alpha_prod = alpha
             else:
-                _, alpha_prod = renderer.render_mesh(
+                _, alpha_prod, _ = renderer.render_mesh(
                     mesh, view, proj, cam_pos, bg=None
                 )
 
@@ -305,6 +317,24 @@ def render_snapshots(
                 -1,
             )
             rows_grad = np.arange(size)[:, None].astype(np.float32)
+
+            def _ssao(rgb_in, depth_map, sil: np.ndarray):
+                """Cheap screen-space occlusion from the depth buffer output:
+                small kernel for creases/edges plus a WIDE kernel that pushes
+                cavity interiors (bores, overhangs) into shadow."""
+                if depth_map is None:
+                    return rgb_in
+                maskprod = sil > 0.02
+                safe = np.where(maskprod, depth_map, 1.0)
+                fine = _blur(safe, max(4, size // 130))
+                broad = _blur(safe, max(40, size // 14))
+                crease = np.clip((fine - safe) * 55.0, 0.0, 1.0) * maskprod
+                cavity = np.clip((broad - safe) * 35.0, 0.0, 1.0) * maskprod
+                occ = np.clip(crease * 0.45 + cavity * 0.85, 0.0, 1.0) * maskprod
+                occ = _blur(occ, max(3, size // 160))
+                return rgb_in * (1.0 - occ * 0.62)[..., None]
+
+            rgb = _ssao(rgb.astype(np.float32), depth, alpha_prod)
             mask = None      # shadow dict {wide, tight} (see _composite)
             refl_rgb = None  # floor reflection: (rgb, per-pixel weight)
             if shadow_on or reflection_on:
@@ -325,14 +355,6 @@ def render_snapshots(
                     line[:] = base_row.max() if cols_ok.any() else size * 0.8
                 drop = rows_grad - line[None, :]
                 below_floor = (drop >= -band).astype(np.float32)
-
-                def _blur(a, rad):
-                    return np.asarray(
-                        Image.fromarray((np.clip(a, 0, 1) * 255).astype(np.uint8)).filter(
-                            ImageFilter.GaussianBlur(radius=float(rad))
-                        ),
-                        dtype=np.float32,
-                    ) / 255.0
 
                 if shadow_on:
                     raw = _shadow_mask(mesh, view, proj, size, KEY_LIGHT[0])
@@ -371,7 +393,7 @@ def render_snapshots(
                             [0, 0, 0, 1],
                         ], dtype=np.float64)
                     )
-                    rgb_ref, _ = renderer.render_mesh(mirrored, view, proj, cam_pos, bg=bg_tuple)
+                    rgb_ref, _, _ = renderer.render_mesh(mirrored, view, proj, cam_pos, bg=bg_tuple)
                     fade = np.clip(1.0 - drop / (0.36 * size), 0.0, 1.0)
                     refl_rgb = (rgb_ref.astype(np.float32), np.clip(fade * 0.55 * foreground_keep, 0.0, 1.0))
             frame_arr = _composite(rgb, alpha_prod, bg_tuple, mask, refl_rgb)
