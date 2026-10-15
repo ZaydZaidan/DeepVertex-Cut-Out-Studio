@@ -4,17 +4,18 @@
 
 # DeepVertex Cut-Out Studio
 
-**Local, GPU-accelerated AI background remover for Linux — no uploads, no accounts, no credits.**
+**Background remover + 3D product-shot factory that runs on *your* GPU.**
+No uploads. No accounts. No credits. No watermark. Ever.
 
 [![CI](https://github.com/ZaydZaidan/DeepVertex-Cut-Out-Studio/actions/workflows/ci.yml/badge.svg)](https://github.com/ZaydZaidan/DeepVertex-Cut-Out-Studio/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](#)
 [![Platform](https://img.shields.io/badge/platform-Linux-lightgrey)](#)
 
-Remove backgrounds from photos entirely on your own machine with
-state-of-the-art alpha-matting models (BiRefNet by default). Built as a
-[clean-room reconstruction](docs/RECON_REPORT.md) of the remove.bg workflow —
-no remove.bg assets, weights, or code are used.
+**Two tools in one app:**
+
+1. **Photo cutouts** — paste-ready transparent background photos with studio-quality edge quality (SOTA alpha matting, BiRefNet/RMBG-2.0), refined as if you had cut the subject and paid for it.
+2. **3D marketing shots** — you have a CAD model (STEP / STL / OBJ / GLB) but no manufactured product yet? Drop it in and get the full set: 6 CAD views, 3/4 hero angles, turntable spins — transparent, pure-white (marketplace-compliant) or studio-lit, ready for your webshop.
 
 </div>
 
@@ -22,20 +23,29 @@ no remove.bg assets, weights, or code are used.
 
 | | |
 |---|---|
-| ![GUI](assets/screenshots/gui_main.png) | ![Preview at minimum size](assets/screenshots/gui_main_min.png) |
-| ![About](assets/screenshots/gui_about.png) | ![Before/after demo](assets/screenshots/demo_person_before_after.jpg) |
+| ![Photo cutout demo](assets/screenshots/demo_person_before_after.jpg) | ![3D studio shot](assets/screenshots/mesh-studio.png) |
+| *One photo: original → cutout* | *One CAD model: studio-lit product shot* |
 
 </div>
 
 ---
 
-## Why
+## Why pay for pixels twice?
 
-Cloud background removers work well but bind you to quotas, quality tiers,
-watermarks, and — most importantly — to sending every photo to a server.
-Cut-Out Studio runs the same *kind* of pipeline locally: your images never
-leave the machine, there are no rate limits, and the full-quality output is
-free because your own GPU does the work.
+Cloud removers work well — but they bind you to quotas, quality tiers,
+watermarks, and, most importantly, to shipping every photo to a stranger's
+server. Cut-Out Studio runs the same *kind* of pipeline on your own machine:
+
+| | Cloud tool | Cut-Out Studio |
+|---|---|---|
+| Upload photos | always | never |
+| Rate limits / credits | yes | **none** |
+| Watermarks / tiered resolution | often | **never** |
+| Batch 1 000 photos | pay per photo | **free, GPU-speed** |
+| Transparent PNG + solid/blur/image backgrounds | pro-tier | **default** |
+
+Your images never leave the machine; the only network traffic is a one-time
+model download. The output is free because your GPU does the work.
 
 ## Features
 
@@ -223,6 +233,44 @@ marketplace galleries, turntable spins, and pre-manufacture branding.
 
 > Both models auto-download into the Hugging Face cache
 > (`~/.cache/huggingface`) on first use.
+
+## Strengths (and honest limits)
+
+<div align="center">
+
+**Best used for**
+
+</div>
+
+- **Privacy-critical photos** — client work, unreleased products, personal
+  data: nothing is uploaded, nothing is logged, nothing is tracked.
+- **High-volume batch jobs** — hundreds of SKUs per day at GPU speed with
+  zero marginal cost, plus a scriptable CLI for pipelines/CI.
+- **Pre-manufacture marketing** — brand your product in renders *before*
+  the factory tooling exists: upload the CAD file, receive a complete
+  marketplace-ready image set in minutes.
+- **Tinkering-friendly** — every stage (matte → refine → background) is a
+  plain function; swap models or backgrounds without touching the core.
+
+<div align="center">
+
+**Current limits, stated plainly**
+
+</div>
+
+- **3D renders are convincing, not photoreal 9/10** — great for catalogue/
+  turntable shots; skip glossy hero shots. Real HDRI sampling and
+  micro-texture maps are on the roadmap (see
+  [`docs/3D_SNAPSHOT_RECON.md`](docs/3D_SNAPSHOT_RECON.md)).
+- **Single-material shading** — no per-part colour assignment (GLTF material
+  groups are flattened to neutral grey) — monochrome product mocks, exactly
+  what an unbranded prototype shot needs.
+- **Fusion `.f3d` files are unreadable by design** (Autodesk proprietary) —
+  use *File ▸ Export STEP / STL*; STEP needs the optional `[step]` extra.
+- **Linux-first** — the GUI/CLI is developed & verified on Linux; macOS and
+  Windows are untested (the matting pipeline itself is cross-platform).
+- **First-run weight download** (~0.9 GB) — the images pipeline is offline
+  only after that.
 
 ## How it works
 

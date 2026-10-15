@@ -206,9 +206,11 @@ def _composite(rgb, alpha_prod, bg_tuple, shadow_mask, refl_rgb=None):
         if refl_rgb is not None:
             ref_rgb, w = refl_rgb
             rgbf = rgbf * (1.0 - w[..., None]) + ref_rgb * w[..., None]
-        dark = 1.0 - np.clip(0.22 * wide + 0.68 * tight, 0.0, 0.78)
+        dark = 1.0 - np.clip(0.25 * wide + 0.55 * tight, 0.0, 0.62)
         rgbf = rgbf * dark[..., None]
-        full = np.ones_like(rgbf[..., :1])
+        # alpha channel must be 0..255 like the RGB channels (0..1 would end up
+        # as a nearly-transparent PNG on GitHub!)
+        full = np.full_like(rgbf[..., :1], 255.0)
         return np.dstack([rgbf, full]).astype(np.uint8)
 
     # transparent: shadow carries alpha below the product silhouette
